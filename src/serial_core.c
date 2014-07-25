@@ -1,6 +1,7 @@
 #include "serial_core.h"
 #include "list.h"
 #include "log.h"
+#include "gecko_interface.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,6 +9,7 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <syslog.h>
 #include <fcntl.h>
 #include <sys/signal.h>
@@ -17,97 +19,148 @@
 #define RUN_AS_THREAD 1
 #endif
 
-unsigned int DO_READ = 0;
-short INPUT_READY = 0;
+static unsigned short DO_READ = 0;
+static unsigned short INPUT_READY = 1;
+static long SIG_IO_COUNT=0;
 void signal_handler_IO(int status)
 {
-	LOGGER(LOG_INFO,"received SIGIO signal. : %d\n", status);
+	LOGGER(LOG_DEBUG,"SIGIO : %d\n", status);
+	SIG_IO_COUNT++;
 	INPUT_READY = 1;
 }
 
 struct tag_data gecko_data;
+
+
+
 void process_message(char *packet)
 {
 	LOGGER(LOG_INFO,"\n\t\tparsing message \nreceived packet :%s",packet);
 	unsigned char device_bdid[BDID_LEN];
-
-	char *split_parts, *saveptr, *saveptr1;
-	int i;
-	memset(device_bdid,'\0', sizeof(device_bdid));
-	memset(gecko_data.device_name,'\0', sizeof(gecko_data.device_name));
-
-//	struct tag_data *gecko_data = malloc(sizeof(struct tag_data));
-
 	int len = strlen(packet);
-	char * p = malloc(len * sizeof(char));
-	strncpy(p, packet, len);
+	char *split_parts, *saveptr, *saveptr1;
+	char first_byte;
 
-//	sscanf(p,"%[^':']:%[^','],",gecko_data->device_name,device_bdid);
-//	sscanf(p,"%[^','],%[^','],",gecko_data->device_name,device_bdid);
-//	device_bdid[BDID_LEN] = '\0';
-	split_parts = strtok_r(p, ":,", &saveptr);
+	first_byte=packet[0];
+	LOGGER(LOG_INFO,"\nFirst Byte :%c\n",first_byte);
+	int i;
+//	memset(device_bdid,'\0', sizeof(device_bdid));
+//	memset(gecko_data,'\0', sizeof(gecko_data));
 
-	for (i = 0; split_parts != NULL; i++)
+
+	unsigned char * packet_without_header = malloc((len+1) * sizeof(char));
+	switch(first_byte)
 	{
-		switch (i)
+		case ADVERTISE_PACKET :
 		{
-		case 0:
-		{
-			strcpy(gecko_data.device_name, split_parts);
+
+			for(i=2;i<len;i++)
+			{
+				packet_without_header[i-2]=packet[i];
+			}
+			packet_without_header[i-2]='\0';
+//			len=strlen((const char *)packet_without_header);
+			len=strlen(packet_without_header);
+			LOGGER(LOG_DEBUG,"\n\t\tparsing received packet_without_header :%s\n",packet_without_header);
+
+
+
+
+			//parses  CT102:20CD39848D16,137,65,0,0,58%,B,33 packet
+			split_parts = strtok_r(( char *)packet_without_header,(const char *) ":,", &saveptr);
+			for (i = 0; split_parts != NULL; i++)
+			{
+				switch (i)
+				{
+					case 0:
+					{
+//						strcpy((char *)gecko_data.device_name,(const char *) split_parts);
+						strcpy(gecko_data.device_name, split_parts);
+						break;
+					}
+					case 1:
+					{
+						LOGGER(LOG_DEBUG,"\n::%s::\n",split_parts);
+//						len = strlen((const char *)split_parts);
+						len = strlen(split_parts);
+//						strncpy((char *)device_bdid,(const char *) split_parts, len);
+						strncpy(device_bdid, split_parts, len);
+						device_bdid[len] = '\0';
+						break;
+					}
+					case 2:
+					{
+						gecko_data.x = atoi(split_parts);
+						break;
+					}
+					case 3:
+					{
+						gecko_data.y = atoi(split_parts);
+						break;
+					}
+					case 4:
+					{
+						gecko_data.z = atoi(split_parts);
+						break;
+					}
+					case 5:
+					{
+						gecko_data.seconds_after_last_motion = atoi(split_parts);
+						break;
+					}
+					case 6:
+					{
+						char * temp = strtok_r(split_parts, "%", &saveptr1);
+						if(temp!=NULL)
+						gecko_data.battery_percent = atoi(temp);
+						break;
+					}
+					case 7:
+					{
+			//			sprintf(gecko_data.beacon_id,"%c",split_parts);
+						gecko_data.beacon_id=*split_parts;
+						break;
+					}
+					case 8:
+					{
+						gecko_data.temperature = atoi(split_parts);
+						break;
+					}
+					case 9:
+					{
+						gecko_data.status = atoi(split_parts);
+						break;
+					}
+				}
+				split_parts = strtok_r(NULL, ":,", &saveptr);
+			}
+			add_update_node(device_bdid, &gecko_data);
 			break;
 		}
-		case 1:
+		case CONNECT_WRITE_RESPONSE_PACKET :
+		case CONNECT_READ_RESPONSE_PACKET :
+		case DISCONNECT_RESPONSE_PACKET :
 		{
-			LOGGER(LOG_DEBUG,"::");
-			LOGGER(LOG_DEBUG,split_parts);
-			LOGGER(LOG_DEBUG,"::\n");
-			len = strlen(split_parts);
-			strncpy(device_bdid, split_parts, len);
-			device_bdid[len] = '\0';
+			for(i=0;i<len;i++)
+			{
+				packet_without_header[i]=packet[i];
+			}
+			packet_without_header[i]='\0';
+//			len=strlen((const char *)packet_without_header);
+			len=strlen(packet_without_header);
+			LOGGER(LOG_DEBUG,"\n\t\tparsing received packet :%s\n",packet_without_header);
+			notify_response(packet_without_header);
 			break;
 		}
-		case 2:
-		{
-			gecko_data.x = atoi(split_parts);
+		default : {
+			LOGGER(LOG_WARNING,"\nUNKNOWN PACKET %s\n",packet_without_header);
 			break;
 		}
-		case 3:
-		{
-			gecko_data.y = atoi(split_parts);
-			break;
-		}
-		case 4:
-		{
-			gecko_data.z = atoi(split_parts);
-			break;
-		}
-		case 5:
-		{
-			gecko_data.seconds_after_last_motion = atoi(split_parts);
-			break;
-		}
-		case 6:
-		{
-			char * temp = strtok_r(split_parts, "%", &saveptr1);
-			gecko_data.battery_percent = atoi(temp);
-			break;
-		}
-		case 7:
-		{
-//			sprintf(gecko_data.beacon_id,"%c",split_parts);
-			break;
-		}
-		case 8:
-		{
-			gecko_data.temperature = atoi(split_parts);
-			break;
-		}
-		}
-		split_parts = strtok_r(NULL, ":,", &saveptr);
 	}
-	add_update_node(device_bdid, &gecko_data);
-	print_all_node();
-	free(p);
+
+
+//	print_all_node();
+	free(packet_without_header);
 //	free(gecko_data);
 
 }
@@ -126,6 +179,7 @@ void* reader(void* arg)
 	short STORE_READ = 0;
 	buffer = malloc(READ_BUFFER_SIZE * sizeof(char));
 	char c = 'd';
+	long prev_io_count=0;
 
 	while (DO_READ)
 	{
@@ -133,13 +187,21 @@ void* reader(void* arg)
 		{
 			if (read(fd, &c, 1) > 0)
 			{
+
 				if (STORE_READ)
+				{
+					prev_io_count=SIG_IO_COUNT;
+					if (i == ERROR_READ_LEN)
+					{
+						LOGGER(LOG_DEBUG,"error read lenr \n");
+
+					}
 					buffer[i++] = c;
+				}
 				if (c == START_DELIMETER)
 				{
 					i = 0;
 					STORE_READ = 1;
-					usleep(100);
 				}
 				else if (c == STOP_DELIMETER)
 				{
@@ -147,8 +209,12 @@ void* reader(void* arg)
 					STORE_READ = 0;
 					LOGGER(LOG_DEBUG,"stop delimiter \n");
 					process_message(buffer);
-					INPUT_READY = 0;
-					break;
+					if(prev_io_count==SIG_IO_COUNT)
+					{
+						INPUT_READY = 0;
+						break;
+					}
+
 				}
 				else if (i == ERROR_READ_LEN)
 				{
@@ -156,7 +222,7 @@ void* reader(void* arg)
 				}
 			}
 		}
-		sleep(1);
+		usleep(POLL_SLEEP);
 	}
 	free(buffer);
 
@@ -215,9 +281,7 @@ int configure_serial_port(int fd)
 void start_serial_reader_thread(int fd)
 {
 	DO_READ = 1;
-
 	struct sigaction saio;
-
 	saio.sa_handler = signal_handler_IO;
 	sigemptyset(&saio.sa_mask);
 	saio.sa_flags = 0;
@@ -257,27 +321,30 @@ int open_serial_port(char * port)
 }
 
 //should use only for writing to serial interface
+
+
 int serial_write(int fd, char * string)
 {
+	write_serial_lock();
 	int status = -1;
 	int len = strlen(string), i;
-	char c = 'w';
+	char c;
+	c='#';
+	write(fd,&c, 1);
+	usleep(WRITE_SLEEP);
 	for (i = 0; i < len; i++)
 	{
 		c = string[i];
 		write(fd, &c, 1);
-		usleep(200);
+		usleep(WRITE_SLEEP);
 	}
-//	if(write(fd, string, strlen(string))!=-1)
-//	{
+	c='$';
+	write(fd,&c, 1);
+	usleep(WRITE_SLEEP);
 	status = tcflush(fd, TCOFLUSH);
 	status = tcdrain(fd);
-//	}
-//	else
-//	{
-//		perror("Something wrong happened in serial writer :");
-//	}
-	LOGGER(LOG_INFO,"wrote ......\r\n");
+	serial_unlock();
+	LOGGER(LOG_INFO,"wrote DATA to UART status(0 ok):%d DATA:%s\r\n",status,string);
 	return status;
 }
 

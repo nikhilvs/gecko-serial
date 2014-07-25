@@ -11,27 +11,83 @@
 #include "log.h"
 #include <syslog.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <signal.h>
 #include <semaphore.h>
+#include <pthread.h>
 #include <syslog.h>
 #include "gecko_interface.h"
 #include "serial_core.h"
 #include "list.h"
 
-#define SERAIL_TEST
+//#define SERAIL_TEST
+#define DEVICE_PORT 1
+
+static short LOCK_INIT = 0;
+static pthread_mutex_t lock;
+static void init_serial_lock()
+{
+	if (pthread_mutex_init(&lock, NULL) != 0)
+	    {
+		LOGGER(LOG_CRIT,"\n mutex init failed\n");
+	    }
+	else
+		LOCK_INIT = 1;
+}
+
+void destroy_serial_lock()
+{
+	if (pthread_mutex_destroy(&lock) != 0)
+		LOGGER(LOG_INFO,"can't destroy rwlock");
+	else
+		LOCK_INIT = 0;
+}
+
+void read_serial_lock()
+{
+	if (!LOCK_INIT)
+		init_serial_lock();
+	pthread_mutex_lock(&lock);
+}
+
+void write_serial_lock()
+{
+	if (!LOCK_INIT)
+		init_serial_lock();
+	if (pthread_mutex_lock(&lock) != 0)
+		LOGGER(LOG_INFO,"can't get rdlock");
+}
+
+void serial_unlock()
+{
+	pthread_mutex_unlock(&lock);
+}
 
 
-sem_t mutex;
-void clean_up()
+
+
+
+
+
+/**
+ * Clean up function, which releases all the resources used by this library.
+ * By default SIGINT signal is registered to call this function.
+ * Resources freed in this function :
+ * 1. Closes device file descriptor
+ * 2. Free the mutex and locks
+ * 3. Closes syslog
+ * @warning fail to call this function, can result in memory leak.
+ */
+void gecko_clean_up()
 {
 //	serial_write(tty_fd, stop_scan);
 	close(tty_fd);
 	stop_reader_thread();
-	sem_destroy(&mutex);
+	destroy_serial_lock();
 	destroy_lock();
 	delete_all_node();
 	close_log();
@@ -42,7 +98,7 @@ void signal_callback_handler(int signum)
 {
 	LOGGER(LOG_DEBUG,"\nCaught signal %d\n", signum);
 	// Cleanup and close up stuff here
-	clean_up();
+	gecko_clean_up();
 	// Terminate program
 	exit(signum);
 }
@@ -68,35 +124,19 @@ void read_display_current_configuration(int fd)
 
 }
 
-void test_write()
-{
-	int i, tiktok = 1;
-	char printbuffer[8];
-	for (i = 0; i < 15; i++)
-	{
-		if (tiktok)
-		{
-			serial_write(tty_fd, START_SCAN);
-			LOGGER(LOG_INFO,"wrote start scan ....");
-			tiktok = 0;
-		}
-		else
-		{
-			serial_write(tty_fd, STOP_SCAN);
-			LOGGER(LOG_INFO,"wrote stop scan ....");
-			tiktok = 1;
-		}
-		sleep(5);
-		LOGGER(LOG_INFO,printbuffer);
-	}
-}
 
-int start_serial(char * port)
+
+/**  Main function which starts the service, this will be an blocking function.If any error is there it returns immediately.
+ * Returns immediately on error, else will be an blocking function.
+ * @param port serial device port name.
+ * @return error status of <b>open()</b> or <b>tcsetattr()</b>.
+ * @note This is an blocking function, so it should be called from different thread.
+ *
+ * */
+int gecko_start_serial_service(char * port)
 {
 
-//	sem_init(&mutex, 0, 0);
-//	signal(SIGINT, signal_callback_handler);
-
+	init_serial_lock();
 	struct sigaction saio;
 	saio.sa_handler = signal_callback_handler;
 	sigemptyset(&saio.sa_mask);
@@ -110,33 +150,28 @@ int start_serial(char * port)
 	int fd = open_serial_port(port);
 	if (fd == -1)
 	{
-		perror("error in open device :");
+		LOGGER(LOG_ERR,"error in open device %s",port);
 		return EXIT_FAILURE;
 	}
 	if (configure_serial_port(fd) != -1)
 	{
+		if(LOG_LEVEL==LOG_DEBUG)
 		read_display_current_configuration(fd);
-		serial_write(fd, START_SCAN);
-//		test_write();
-		LOGGER(LOG_INFO,"send start scan command to serial device\n");
-		start_serial_reader_thread(fd);
 
-//		while (1) {
-//			LOGGER(LOG_INFO,"sleeping ...\n");
-//			sleep(3);
-//			print_all_node();
-//		}
-//		sem_wait(&mutex);
+		serial_write(fd, START_SCAN);
+		LOGGER(LOG_DEBUG,"send start scan command to serial device\n");
+		start_serial_reader_thread(fd);
 	}
 	else
 	{
+		LOGGER(LOG_CRIT,"Error in opening serial port\n");
 		perror("error in configuring port");
 	}
 
 	return EXIT_SUCCESS;
 }
 
-/* function to show bytes in memory, from location start to start+n*/
+/** /fn function to show bytes in memory, from location start to start+n **/
 void show_mem_rep(char *start, int n)
 {
 	int i;
@@ -153,11 +188,12 @@ int test_main()
 {
 
 
-	register_callback(notify_others);
+//	register_advertisement_callback(callback_advrtsmnt);
+//	register_command_response_callback(callback_response);
 //	int i = 0x01234567,e,f;
 //	show_mem_rep((char *)&i, sizeof(i));
 //	char port[13];
-	char * arr = "CT102:20CD39848D16,31,23,1,0,45%,B,30\0";
+//	char * arr = "1,CT102:20CD39848D16,31,23,1,0,45%,B,30\0";
 
 
 //	char a[6],b[13],g[4]={},f='a';
@@ -172,17 +208,18 @@ int test_main()
 ////
 //	printf("\r\n%s:%s,%d,%d,%d,%d,%s,%c,%d\n",a,b,x,y,z,time,g,f,t);
 
-	 process_message(arr);
-
-
-	 arr= "CT102:20CD39848D16,137,65,0,0,58%,B,35";
-	 process_message(arr);
-
-	 arr= "CT102:20CD39848D17,137,65,0,0,58%,B,35";
-	 process_message(arr);
-
-	 arr= "CT102:20CD39848D16,137,65,0,0,58%,B,33";
-	 process_message(arr);
+//	 arr="3,20CD39848D16,79,0";
+//	 process_message(arr);
+//
+//
+//	 arr= "1,CT102:20CD39848D16,137,65,0,0,58%,B,35\0";
+//	 process_message(arr);
+//
+//	 arr= "1,CT102:20CD39848D17,137,65,0,0,58%,B,35\0";
+//	 process_message(arr);
+//
+//	 arr= "1,CT102:20CD39848D16,137,65,0,0,58%,B,33\0";
+//	 process_message(arr);
 
 
 //	 get_device_list();
@@ -194,7 +231,7 @@ int test_main()
 	{
 		printf(
 				"\nNeed UART PORT name as argument : ex- prg-name /dev/ttyUSB0\r\n");
-		clean_up();
+		gecko_clean_up();
 		exit(0);
 	}
 	strcpy(port,argv[1]);

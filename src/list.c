@@ -11,9 +11,10 @@
 
 //#define LIST_TEST 0
 struct tag *start = NULL;
-pthread_rwlock_t lock;
+
 static short LOCK_INIT = 0;
 //void notify(struct tag * );
+static pthread_rwlock_t lock;
 static void init_lock()
 {
 	if (pthread_rwlock_init(&lock, NULL) != 0)
@@ -71,8 +72,8 @@ void add_update_node(unsigned char *bdid, struct tag_data* data)
 		node->next = start;
 		start = node;
 
-		strncpy(node->bdid, bdid, strlen(bdid));
-		node->bdid[strlen(bdid)] = '\0';
+		strncpy((char *)node->bdid,(const char *)bdid, (size_t)strlen((const char *)bdid));
+		node->bdid[strlen((const char *)bdid)] = '\0';
 	}
 	else
 	{
@@ -85,8 +86,9 @@ void add_update_node(unsigned char *bdid, struct tag_data* data)
 	node->data.z = data->z;
 	node->data.beacon_id = data->beacon_id;
 	node->data.seconds_after_last_motion = data->seconds_after_last_motion;
-	strcpy(node->data.device_name, data->device_name);
-	notify(node);
+	node->data.status = data->status;
+	strcpy((char *)node->data.device_name, (const char *)data->device_name);
+	notify_advertisement(node);
 	unlock();
 
 //	free(data);
@@ -99,7 +101,7 @@ struct tag * find_node(unsigned char *bdid)
 	read_lock();
 	for (temp = start; temp != NULL; temp = temp->next)
 	{
-		if (!strcmp(temp->bdid, bdid))
+		if (!strcmp((const char *)temp->bdid,(const char *) bdid))
 		{
 			LOGGER(LOG_DEBUG,"Search successful for node\n");
 			break;
@@ -118,7 +120,7 @@ void delete_node(unsigned char *bdid)
 	next_node = node->next;
 	while (node != NULL)
 	{
-		if (!strcmp(node->bdid, bdid))
+		if (!strcmp((const char *)node->bdid, (const char *)bdid))
 		{
 			if (prev_node == NULL)   //first node
 			{
@@ -174,6 +176,7 @@ int get_number_of_connected_devices()
 	return count;
 }
 
+//unsigned char device_list[DEVICE_LIST_LEN];
 unsigned char* get_all_node_in_string()
 {
 	struct tag* node;
@@ -184,8 +187,8 @@ unsigned char* get_all_node_in_string()
 	node = start;
 	while (node != NULL)
 	{
-		strcat(device_list, node->bdid);
-		strcat(device_list, ",");
+		strcat((char *)device_list,(const char *) node->bdid);
+		strcat((char *)device_list,(const char *) ",");
 		node = node->next;
 	}
 

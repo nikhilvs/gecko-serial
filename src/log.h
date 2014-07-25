@@ -7,10 +7,10 @@
 
 #ifndef LOG_H_
 #define LOG_H_
+#include <syslog.h>
 
 
-
-
+#define LOG_LEVEL LOG_INFO
 
 void init_log();
 

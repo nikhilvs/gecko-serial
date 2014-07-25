@@ -1,8 +1,11 @@
-/*
- * gecko_interface.h
+/**
+ * @file gecko_interface.h
+ * @author nikhilvs9999
+ * @date Jun 9, 2014
+ * @brief API to interact with BLE master device over UART.
  *
- *  Created on: Jun 9, 2014
- *      Author: nikhilvs9999
+ * This library provide the functionality to interact with gecko BLE master over uart.
+ *
  */
 
 #ifndef GECKO_INTERFACE_H_
@@ -16,83 +19,64 @@
 #define DEVICE_NAME_LEN 11
 #define SCAN_PERIOD  7
 #define DEVICE_LIST_LEN 280
-#define DEVICE_PORT  "/dev/ttyS2"
 
 
-#define START_SCAN "#11000$"
-#define STOP_SCAN  "#21000$"
 
-/*
- *      LOG LEVELS INFO
- *
- *    LOG_EMERG	    0	   *  system is unusable *
- *    LOG_ALERT	    1	   * action must be taken immediately
- *    LOG_CRIT	    2	   * critical conditions *
- *    LOG_ERR		3	   * error conditions *
- *	  LOG_WARNING	4	   * warning conditions *
- *    LOG_NOTICE	5	   * normal but significant condition *
- *    LOG_INFO 	    6	   * informational *
- * 	  LOG_DEBUG            * uses printf instead of syslog
- */
-#define LOG_LEVEL LOG_INFO
+void gecko_set_log_level(int);
 
 
-/*
- *
- * struct tag_data{
- * 	unsigned short temperature;
- *  unsigned short battery_percent;
- * 	unsigned char event_type[8];
- * 	unsigned char device_name[11];
- * };
- *
- *	struct tag{
- * 	  struct tag_data data;
- * 	  unsigned char bdid[BDID_LEN];
- *    };
- */
-
-
+//! Struct for storing BLE peripheral device data.
+/*! This stucture stores the latest advertisement packet information*/
 struct tag_data
 {
-	unsigned short temperature;
-	unsigned short battery_percent;
-	unsigned char  device_name[DEVICE_NAME_LEN];
-	unsigned char  beacon_id;
-	unsigned short x;
-	unsigned short y;
-	unsigned short z;
-	unsigned int   seconds_after_last_motion;
+	unsigned short temperature;  /**< temperature value read from tag */
+	unsigned short battery_percent;   /**< battery percent value read from tag */
+	unsigned char  device_name[DEVICE_NAME_LEN];  /**< device name read from tag */
+	unsigned char  beacon_id;  /**< beacon id read from tag,for ota purpose */
+	unsigned short x;    /**< x coordinate */
+	unsigned short y;	 /**< y coordinate */
+	unsigned short z;    /**< z coordinate */
+	unsigned int   seconds_after_last_motion; /**< seconds after last motion read from tag */
+	unsigned short status; /**< status of advertisement(motion detected(0),short press(1),long press(2)) */
 };
 
+//! Struct for managing device data.
+/*! This is just an data structure to store all device info, since there wont be more devices, i have used linked list  */
 struct tag
 {
 	struct tag_data data;
-	unsigned char bdid[BDID_LEN];
+	unsigned char bdid[BDID_LEN]; /**< BDID of the tag */
 	struct tag *next;
 };
 
 
 
-int send_command(char * );
+
+int gecko_start_serial_service(char * );
+
+typedef struct tag tag;
+typedef void (*advertisement_callback)(struct tag *);
+typedef void (*response_callback)(unsigned char*);
+
+
+int gecko_send_command(char * );
+
+
+unsigned char* gecko_get_scanned_device_list(int scan_period);
 
 
 
-/*
- *
- * Call this function to receive the in memory list of devices, note that this function is not reentrant.
- *
- */
-unsigned char* get_device_list();
+void gecko_register_advertisement_callback(advertisement_callback);
 
-typedef void (*callback)(struct tag * data);
+void gecko_register_command_response_callback(response_callback );
 
-void register_callback(callback ptr_reg_callback);
-void notify_others(struct tag *);
 
-/*
- * Use this function to test the call back function without help of UART
- */
-int test_main();
+void gecko_clean_up();
+
+
+
+
+
+
 
 #endif /* GECKO_INTERFACE_H_ */
