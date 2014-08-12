@@ -31,8 +31,8 @@ struct tag_data
 {
 	unsigned short temperature;  /**< temperature value read from tag */
 	unsigned short battery_percent;   /**< battery percent value read from tag */
-	unsigned char  device_name[DEVICE_NAME_LEN];  /**< device name read from tag */
-	unsigned char  beacon_id;  /**< beacon id read from tag,for ota purpose */
+	char  device_name[DEVICE_NAME_LEN];  /**< device name read from tag */
+	char  beacon_id;  /**< beacon id read from tag,for ota purpose */
 	unsigned short x;    /**< x coordinate */
 	unsigned short y;	 /**< y coordinate */
 	unsigned short z;    /**< z coordinate */
@@ -56,7 +56,7 @@ int gecko_start_serial_service(char * );
 
 typedef struct tag tag;
 typedef void (*advertisement_callback)(struct tag *);
-typedef void (*response_callback)(unsigned char*);
+typedef void (*response_callback)( char*);
 
 
 int gecko_send_command(char * );

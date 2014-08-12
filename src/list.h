@@ -14,11 +14,11 @@
 
 
 
-struct tag * find_node(unsigned char *);
-void add_update_node(unsigned char[], struct tag_data*);
-void delete_node(unsigned char *);
+struct tag * find_node( char *);
+void add_update_node( char[], struct tag_data*);
+void delete_node( char *);
 void delete_all_node();
 void destroy_lock();
-unsigned char* get_all_node_in_string();
+char* get_all_node_in_string();
 void print_all_node();
 #endif /* HASH_H_ */

@@ -50,6 +50,7 @@ extern "C"
 #define CONNECT_WRITE_RESPONSE_PACKET  '3'
 #define CONNECT_READ_RESPONSE_PACKET  '4'
 #define DISCONNECT_RESPONSE_PACKET  '5'
+#define DEBUG_PACKET  '6'    // remove it later
 
 int tty_fd;
 
@@ -65,7 +66,7 @@ void stop_reader_thread();
 void dump(char *);
 
 
-void notify_response(unsigned char *);
+void notify_response( char *);
 void notify_advertisement(tag * );
 
 void process_message(char *);

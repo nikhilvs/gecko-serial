@@ -54,7 +54,7 @@ void notify_advertisement(struct tag * data)
 /**
  *  This is an internal function,don't use
  */
-void notify_response(unsigned char * data)
+void notify_response(char * data)
 {
 	LOGGER(LOG_INFO,"\nin notify\n");
 	if(notify_response_callback!=NULL)

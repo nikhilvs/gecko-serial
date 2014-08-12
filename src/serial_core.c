@@ -24,7 +24,7 @@ static unsigned short INPUT_READY = 1;
 static long SIG_IO_COUNT=0;
 void signal_handler_IO(int status)
 {
-	LOGGER(LOG_DEBUG,"SIGIO : %d\n", status);
+//	LOGGER(LOG_DEBUG,"SIGIO : %d\n", status);
 	SIG_IO_COUNT++;
 	INPUT_READY = 1;
 }
@@ -36,19 +36,18 @@ struct tag_data gecko_data;
 void process_message(char *packet)
 {
 	LOGGER(LOG_INFO,"\n\t\tparsing message \nreceived packet :%s",packet);
-	unsigned char device_bdid[BDID_LEN];
+	char device_bdid[BDID_LEN];
 	int len = strlen(packet);
 	char *split_parts, *saveptr, *saveptr1;
 	char first_byte;
 
 	first_byte=packet[0];
-	LOGGER(LOG_INFO,"\nFirst Byte :%c\n",first_byte);
+//	LOGGER(LOG_INFO,"\nFirst Byte :%c\n",first_byte);
 	int i;
 //	memset(device_bdid,'\0', sizeof(device_bdid));
 //	memset(gecko_data,'\0', sizeof(gecko_data));
 
-
-	unsigned char * packet_without_header = malloc((len+1) * sizeof(char));
+	char * packet_without_header = malloc((len+1) * sizeof(char));
 	switch(first_byte)
 	{
 		case ADVERTISE_PACKET :
@@ -67,6 +66,7 @@ void process_message(char *packet)
 
 
 			//parses  CT102:20CD39848D16,137,65,0,0,58%,B,33 packet
+			//        UNKWN:20CD39848D16,255,255,255,255,255,G,255,255
 			split_parts = strtok_r(( char *)packet_without_header,(const char *) ":,", &saveptr);
 			for (i = 0; split_parts != NULL; i++)
 			{
@@ -80,7 +80,7 @@ void process_message(char *packet)
 					}
 					case 1:
 					{
-						LOGGER(LOG_DEBUG,"\n::%s::\n",split_parts);
+//						LOGGER(LOG_DEBUG,"\n::%s::\n",split_parts);
 //						len = strlen((const char *)split_parts);
 						len = strlen(split_parts);
 //						strncpy((char *)device_bdid,(const char *) split_parts, len);
@@ -117,7 +117,6 @@ void process_message(char *packet)
 					}
 					case 7:
 					{
-			//			sprintf(gecko_data.beacon_id,"%c",split_parts);
 						gecko_data.beacon_id=*split_parts;
 						break;
 					}
@@ -139,6 +138,7 @@ void process_message(char *packet)
 		}
 		case CONNECT_WRITE_RESPONSE_PACKET :
 		case CONNECT_READ_RESPONSE_PACKET :
+		case DEBUG_PACKET :
 		case DISCONNECT_RESPONSE_PACKET :
 		{
 			for(i=0;i<len;i++)
@@ -153,7 +153,7 @@ void process_message(char *packet)
 			break;
 		}
 		default : {
-			LOGGER(LOG_WARNING,"\nUNKNOWN PACKET %s\n",packet_without_header);
+			LOGGER(LOG_WARNING,"\nUNKNOWN PACKET HEADER %s\n",packet_without_header);
 			break;
 		}
 	}
@@ -191,7 +191,7 @@ void* reader(void* arg)
 				if (STORE_READ)
 				{
 					prev_io_count=SIG_IO_COUNT;
-					if (i == ERROR_READ_LEN)
+					if (i > ERROR_READ_LEN)
 					{
 						LOGGER(LOG_DEBUG,"error read lenr \n");
 
@@ -216,7 +216,7 @@ void* reader(void* arg)
 					}
 
 				}
-				else if (i == ERROR_READ_LEN)
+				else if (i >= ERROR_READ_LEN)
 				{
 					LOGGER(LOG_DEBUG,"error read lenr \n");
 				}
@@ -344,7 +344,9 @@ int serial_write(int fd, char * string)
 	status = tcflush(fd, TCOFLUSH);
 	status = tcdrain(fd);
 	serial_unlock();
-	LOGGER(LOG_INFO,"wrote DATA to UART status(0 ok):%d DATA:%s\r\n",status,string);
+//	LOGGER(LOG_INFO,"\nwrote DATA to UART status(0 ok):%d DATA:%s\r\n",status,string);
+	printf("\nwrote DATA to UART status(0 ok):%d DATA:%s\r\n",status,string);
+	fflush(stdout);
 	return status;
 }
 

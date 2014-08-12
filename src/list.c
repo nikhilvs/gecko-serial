@@ -61,7 +61,7 @@ struct tag* create_node()
 	return node;
 }
 
-void add_update_node(unsigned char *bdid, struct tag_data* data)
+void add_update_node(char *bdid, struct tag_data* data)
 {
 
 	struct tag *node = find_node(bdid);
@@ -94,7 +94,7 @@ void add_update_node(unsigned char *bdid, struct tag_data* data)
 //	free(data);
 }
 
-struct tag * find_node(unsigned char *bdid)
+struct tag * find_node( char *bdid)
 {
 	struct tag *temp;
 
@@ -111,7 +111,7 @@ struct tag * find_node(unsigned char *bdid)
 	return temp;
 }
 
-void delete_node(unsigned char *bdid)
+void delete_node( char *bdid)
 {
 	LOGGER(LOG_DEBUG,"node delete\n");
 	struct tag *node, *prev_node = NULL, *next_node;
@@ -177,12 +177,12 @@ int get_number_of_connected_devices()
 }
 
 //unsigned char device_list[DEVICE_LIST_LEN];
-unsigned char* get_all_node_in_string()
+char* get_all_node_in_string()
 {
 	struct tag* node;
 //	int dev_count = (int)get_number_of_connected_devices();
 //	char * device_list=malloc((dev_count*sizeof(char))+dev_count);
-	static unsigned char device_list[DEVICE_LIST_LEN];
+	static  char device_list[DEVICE_LIST_LEN];
 	memset(device_list, '\0', sizeof(device_list));
 	node = start;
 	while (node != NULL)
