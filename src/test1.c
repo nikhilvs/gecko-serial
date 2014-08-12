@@ -132,7 +132,7 @@ void timer_handler(int sig, siginfo_t *si, void *uc)
  */
 void send_disconnect_comand()
 {
-	char cmd[120];
+	static char cmd[120];
 	sprintf(cmd,disconnect_command, testBDID);
 	currently_running_command = cmd;
 	usleep(4 * 1000 * 1000);
@@ -245,7 +245,7 @@ void* gecko_tester(void * arg)
 	int i, j;
 
 	int len = strlen(cmd[0]);
-	char command[100];
+	static char command[100];
 
 	printf("\nInside Gecko Tester");
 
