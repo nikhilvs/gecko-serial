@@ -44,8 +44,6 @@ void process_message(char *packet)
 	first_byte=packet[0];
 //	LOGGER(LOG_INFO,"\nFirst Byte :%c\n",first_byte);
 	int i;
-//	memset(device_bdid,'\0', sizeof(device_bdid));
-//	memset(gecko_data,'\0', sizeof(gecko_data));
 
 	char * packet_without_header = malloc((len+1) * sizeof(char));
 	switch(first_byte)
