@@ -137,6 +137,7 @@ void process_message(char *packet)
 		case CONNECT_WRITE_RESPONSE_PACKET :
 		case CONNECT_READ_RESPONSE_PACKET :
 		case DEBUG_PACKET :
+		case ECHO_PACKET :
 		case DISCONNECT_RESPONSE_PACKET :
 		{
 			for(i=0;i<len;i++)

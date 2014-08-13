@@ -44,7 +44,6 @@ void gecko_set_log_level(int level)
  */
 void notify_advertisement(struct tag * data)
 {
-	LOGGER(LOG_INFO,"\nin notify\n");
 	if(notify_callback!=NULL)
 	(*notify_callback)(data);
 	else
@@ -56,7 +55,6 @@ void notify_advertisement(struct tag * data)
  */
 void notify_response(char * data)
 {
-	LOGGER(LOG_INFO,"\nin notify\n");
 	if(notify_response_callback!=NULL)
 	(*notify_response_callback)(data);
 	else

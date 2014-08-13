@@ -16,33 +16,32 @@
 #include <semaphore.h>
 #include "gecko_interface.h"
 #include "timer_api.h"
+#include "gpio.h"
 
 #define UART_PORT  "/dev/ttyS2"
 
-#define  GECKO_SEND_TIMEOUT     25
-#define  TIMER_RESTART_INTERVAL 25
+#define  GECKO_SEND_TIMEOUT     20
+#define  TIMER_RESTART_INTERVAL 20
 #define  RETRY_LIMIT            3
 
 sem_t mutex1;
 
-char *cmd[] =
-{ "3,%s,68,9,4", "3,%s,71,10,12" };
-char *disconnect_command = "5,%s";
-char *disconnect_command_response[] =
+const char *cmd[] =
+{ "3,%s,68,9,4", "3,%s,71,10,12"};
+//{ "8,%s-echo-test" };
+const char *disconnect_command = "5,%s";
+const char *disconnect_command_response[] =
 { "5,%s,1", "5,%s,0" };
 
 char testBDID[20];
-char *success_response[] =
+const char *success_response[] =
 { "3,%s,71,1", "3,%s,68,1" };
-char *failure_response[] =
+const char *failure_response[] =
 { "3,%s,71,0", "3,%s,68,0" };
 
-char *valid_response[] =
-{ "3,%s,71,1", "3,%s,68,1", "3,%s,71,0",
-		"3,%s,68,0" };
-char *debug_disconnect_ack = "5,%s,3";
-
-
+const char *valid_response[] =
+{ "3,%s,71,1", "3,%s,68,1", "3,%s,71,0", "3,%s,68,0"};
+const char *debug_disconnect_ack = "5,%s,3";
 
 //char *cmd[] =
 //{ "3,D0FF5066A254,68,9,4", "3,D0FF5066A254,71,10,12" };
@@ -61,14 +60,11 @@ char *debug_disconnect_ack = "5,%s,3";
 //		"3,D0FF5066A254,68,0" };
 //char *debug_disconnect_ack = "5,D0FF5066A254,3";
 
-
-
-
-
-char *debug_ack = "6,3";
+const char *debug_ack = "6,3";
 
 char *currently_running_command = NULL;
 int retry_count = RETRY_LIMIT;
+short gpio_initialized = 0;
 
 sigset_t mask;
 timer_t timerid;
@@ -85,9 +81,22 @@ void unblock()
 void power_reset()
 {
 	/*
-	 * Not implemented..
+	 * Will work only if gecko hardware with reset pin is configured
 	 */
+	int status;
 	printf("Doing power reset ......");
+	if (!gpio_initialized)
+	{
+		printf("inside init power reset ......");
+		if ((status = initialize_gecko_gpio()) != -1)
+			gpio_initialized = 1;
+	}
+	if (gpio_initialized)
+	{
+		printf("inside do power reset ......");
+		do_power_reset();
+	}
+
 }
 
 void send_command(char *command)
@@ -121,6 +130,7 @@ void timer_handler(int sig, siginfo_t *si, void *uc)
 					"Retry Limit Over ....Possible cause : Master BLE has power reset problem ...\n");
 			stop_timer(&mask, timerid, &its);
 			power_reset();
+			gecko_send_command("1,1000\0");
 			unblock();
 		}
 	}
@@ -133,7 +143,7 @@ void timer_handler(int sig, siginfo_t *si, void *uc)
 void send_disconnect_comand()
 {
 	static char cmd[120];
-	sprintf(cmd,disconnect_command, testBDID);
+	sprintf(cmd, disconnect_command, testBDID);
 	currently_running_command = cmd;
 	usleep(4 * 1000 * 1000);
 	printf("\nsending disconnect command :%s", currently_running_command);
@@ -149,11 +159,16 @@ void send_disconnect_comand()
  */
 void callback_advrtsmnt(struct tag * data)
 {
-	if ( strcmp((char *) data->bdid, testBDID)==0 ) {
-		printf("\nGot callback advertistment test device %s status: %d\n", testBDID, data->data.status);
+	if (strcmp((char *) data->bdid, testBDID) == 0)
+	{
+		printf("\nGot callback advertistment test device %s status: %d\n",
+				testBDID, data->data.status);
 	}
-	else {
-		printf("\nOK got callback advertisement in test app for %s status :%d\n", data->bdid,data->data.status);
+	else
+	{
+		printf(
+				"\nOK got callback advertisement in test app for %s status :%d\n",
+				data->bdid, data->data.status);
 	}
 }
 
@@ -173,7 +188,6 @@ void callback_response(char * data)
 	 * Here i send disconnect command other than the responses of disconnect command
 	 */
 //	if(data[0]!='5' && (strlen(data)>3))
-
 	len = sizeof(valid_response) / sizeof(*valid_response);
 	fflush(stdout);
 
@@ -182,7 +196,7 @@ void callback_response(char * data)
 	char debug_dis_ack[50];
 	for (i = 0; i < len; i++)
 	{
-		sprintf(response[i],valid_response[i],testBDID);
+		sprintf(response[i], valid_response[i], testBDID);
 		if (strcmp(data, response[i]) == 0)
 		{
 			stop_timer(&mask, timerid, &its);
@@ -197,8 +211,8 @@ void callback_response(char * data)
 	if (got_response)
 		return;
 
-	sprintf(debug_ack,debug_ack,testBDID);
-	sprintf(debug_dis_ack,debug_disconnect_ack,testBDID);
+	sprintf(debug_ack, debug_ack, testBDID);
+	sprintf(debug_dis_ack, debug_disconnect_ack, testBDID);
 	if ((strcmp(data, debug_dis_ack) == 0))
 	{
 		printf("\nOK Got Disconnnect command ACK\n");
@@ -217,7 +231,7 @@ void callback_response(char * data)
 
 		for (i = 0; i < 2; i++)
 		{
-			sprintf(response[i],disconnect_command_response[i],testBDID);
+			sprintf(response[i], disconnect_command_response[i], testBDID);
 			if (strcmp(data, response[i]) == 0)
 			{
 				stop_timer(&mask, timerid, &its);
@@ -244,7 +258,8 @@ void* gecko_tester(void * arg)
 
 	int i, j;
 
-	int len = strlen(cmd[0]);
+	int len;
+	int no_commands=sizeof(cmd) / sizeof(*cmd);
 	static char command[100];
 
 	printf("\nInside Gecko Tester");
@@ -258,7 +273,7 @@ void* gecko_tester(void * arg)
 	usleep(10 * 1000 * 1000);
 
 	for (j = 0; j < 5; j++)
-		for (i = 0; i < 2; i++)
+		for (i = 0; i < no_commands; i++)
 		{
 			sem_wait(&mutex1);
 			len = strlen(cmd[i]);
@@ -266,8 +281,8 @@ void* gecko_tester(void * arg)
 			fflush(stdout);
 			usleep(2 * 1000 * 1000);
 //			strcpy(command, cmd[i]);
-			memset(command,'\0',strlen(command));
-			sprintf(command,cmd[i],testBDID);
+			memset(command, '\0', strlen(command));
+			sprintf(command, cmd[i], testBDID);
 //			command[len] = '\0';
 			currently_running_command = command;
 			printf("\nsending command :%s", currently_running_command);
@@ -308,26 +323,25 @@ void* start_uart(void* arg)
 	return NULL;
 }
 
+int main(int argc, char** argv)
+{
 
-
-
-int main(int argc, char** argv){
-
-	if ( argc < 3) {
+	if (argc < 3)
+	{
 		printf("Please enter in example1 <serialPort> <testBDID>\n\n");
-		printf("Where \n<serialPort> is the the serial device name, e.g. /dev/ttyUSB0\n");
+		printf(
+				"Where \n<serialPort> is the the serial device name, e.g. /dev/ttyUSB0\n");
 		printf("<testBDID> is the test BDID, e.g.D0FF5066A254 \n");
 		exit(0);
 	}
 
 	printf("\n\t!!!Hello gecko  World!!!\n"); /* prints !!!Hello World!!! */
 
-	
-
-	char* port=argv[1];
+	char* port = argv[1];
 	strcpy(testBDID, argv[2]);
-	
-	printf("Connecting to port '%s' and testing with device '%s'\n", port, testBDID);
+
+	printf("Connecting to port '%s' and testing with device '%s'\n", port,
+			testBDID);
 	gecko_set_log_level(7);
 	gecko_register_advertisement_callback(callback_advrtsmnt);
 	gecko_register_command_response_callback(callback_response);

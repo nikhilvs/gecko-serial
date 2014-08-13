@@ -12,7 +12,7 @@ LIBS = -lpthread -lrt
 # the build target:
 TARGET = test1
 
-SOURCES = test1.c gecko_interface.c list.c log.c serial_core.c serial_main.c timer_api.c
+SOURCES = test1.c gecko_interface.c list.c log.c serial_core.c serial_main.c timer_api.c gpio.c
 
 OBJECTS = $(SOURCES:.c=.o) 
 

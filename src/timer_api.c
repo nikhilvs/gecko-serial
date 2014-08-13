@@ -10,17 +10,17 @@
 
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                                } while (0)
-
-static void handler(int sig, siginfo_t *si, void *uc)
-{
-	/* Note: calling printf() from a signal handler is not
-	 strictly correct, since printf() is not async-signal-safe;
-	 see signal(7) */
-
-	printf("Caught signal %d\n", sig);
-//           print_siginfo(si);
-//           signal(sig, SIG_IGN);
-}
+//
+//static void handler(int sig, siginfo_t *si, void *uc)
+//{
+//	/* Note: calling printf() from a signal handler is not
+//	 strictly correct, since printf() is not async-signal-safe;
+//	 see signal(7) */
+//
+//	printf("Caught signal %d\n", sig);
+////           print_siginfo(si);
+////           signal(sig, SIG_IGN);
+//}
 
 void initialize_timer(sigset_t * mask, timer_t * timerid,
 		struct itimerspec * its, timer_callback callback_function)

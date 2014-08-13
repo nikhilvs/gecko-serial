@@ -51,6 +51,7 @@ extern "C"
 #define CONNECT_READ_RESPONSE_PACKET  '4'
 #define DISCONNECT_RESPONSE_PACKET  '5'
 #define DEBUG_PACKET  '6'    // remove it later
+#define ECHO_PACKET  '8'    // remove it later
 
 int tty_fd;
 
