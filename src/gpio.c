@@ -97,6 +97,9 @@ int initialize_gecko_gpio()
 	int status = -1;
 	if (reserve_gpio_port(GPIO_PORT) != -1 && set_gpio_direction(OUT) != -1)
 	{
+		/**
+		 * Default value of this pin should be high.
+		 */
 		status = set_gpio_value(HIGH);
 	}
 	return status;
