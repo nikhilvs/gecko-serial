@@ -265,9 +265,12 @@ int configure_serial_port(int fd)
 
 	//disables software control
 	options.c_iflag &= ~(IXON | IXOFF | IXANY);
+	options.c_iflag &= ~ICRNL;
+
 
 	//disables h/w control
 	options.c_cflag &= ~CNEW_RTSCTS;
+	options.c_cflag &= ~(HUPCL | PARODD);
 
 	tcflush(fd, TCIOFLUSH);
 	status = tcsetattr(fd, TCSANOW, &options);
