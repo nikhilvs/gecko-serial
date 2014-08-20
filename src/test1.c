@@ -20,8 +20,8 @@
 
 #define UART_PORT  "/dev/ttyS2"
 
-#define  GECKO_SEND_TIMEOUT     20
-#define  TIMER_RESTART_INTERVAL 20
+#define  GECKO_SEND_TIMEOUT     25
+#define  TIMER_RESTART_INTERVAL 25
 #define  RETRY_LIMIT            3
 
 sem_t mutex1;
