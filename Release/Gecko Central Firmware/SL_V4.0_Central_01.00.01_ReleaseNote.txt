@@ -1,0 +1,17 @@
+
+Release Note:
+
+Central release version: SL_V4.0_Central_01.00.01
+
+V4.0 - Hardware version
+01.00.01 - Firmware version
+
+Below are the firmware changes on Gecko central:
+ 
+1.Added commands for configuring the door motion,led,buzzer from central to beacon.
+2.Added commands for configuring the button press,led,buzzer from central to beacon.
+3.After connection, central handles the connection parameter update for beacon.
+
+Hardware changes on gecko central
+
+None
